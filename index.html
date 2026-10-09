@@ -138,6 +138,15 @@
 
     .card.bar .icon { font-size: var(--icon-size); line-height: 1; }
 
+    .icon-box { display: flex; align-items: center; gap: 5px; flex: none; }
+
+    .public-star {
+      font-size: calc(var(--icon-size) * 0.45);
+      line-height: 1;
+      color: #ffd54a;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    }
+
     .card.bar .name { font-size: var(--name-size); font-weight: 700; letter-spacing: 0.05em; }
 
     .bar-right { display: flex; align-items: center; gap: 12px; flex: none; }
@@ -370,7 +379,9 @@
         { id: 'memo',    name: '喵喵背单词',    url: 'https://studio.memocard.cn/memo-api/s/3hSF1fXoCjJTp9pzPz8FWw2SW3ZCpb-2', icon: '🐱', color: '#ff9f43' },
         { id: 'zhidao',  name: '知到',          url: 'https://onlineweb.zhihuishu.com/onlinestuh5', icon: '🎓', color: '#22c55e' },
         { id: 'iwrite',  name: '爱写作',        url: 'https://iwrite.unipus.cn', icon: '✍️', color: '#8b5cf6' },
-        { id: 'dolphin', name: '海豚实验平台',  url: 'https://neu.aige.dilabs.cn/user-center/login/index', icon: '🐬', color: '#14b8a6' }
+        { id: 'dolphin', name: '海豚实验平台',  url: 'https://neu.aige.dilabs.cn/user-center/login/index', icon: '🐬', color: '#14b8a6' },
+        { id: 'chem',    name: '化学实验选课',  url: 'http://210.30.206.181:380/model/Center/selectitemtime.aspx?tblKssyxmid=244&tblexplanid=151&schoolyearid=48&tblECourseID=500&tblPubCourseID=1225', icon: '🧪', color: '#0ea5e9' },
+        { id: 'xuanke',  name: '一般选课',      url: 'https://jwxk.neu.edu.cn/xsxk/profile/index.html', icon: '📋', color: '#f43f5e' }
       ];
 
       var PALETTE = [
@@ -518,13 +529,27 @@
 
         var left = document.createElement('span');
         left.className = 'bar-left';
+
+        var iconBox = document.createElement('span');
+        iconBox.className = 'icon-box';
+
+        if (site.kind === 'public') {
+          var star = document.createElement('span');
+          star.className = 'public-star';
+          star.textContent = '★';
+          star.title = '公共网站';
+          iconBox.appendChild(star);
+        }
+
         var icon = document.createElement('span');
         icon.className = 'icon';
         icon.textContent = site.icon;
+        iconBox.appendChild(icon);
+
         var name = document.createElement('span');
         name.className = 'name';
         name.textContent = site.name;
-        left.appendChild(icon);
+        left.appendChild(iconBox);
         left.appendChild(name);
 
         var right = document.createElement('span');
