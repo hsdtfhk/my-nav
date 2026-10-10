@@ -310,6 +310,27 @@
 
     .toast[hidden] { display: none; }
 
+    /* 右下角「数据备份」 */
+    .backup-fab {
+      position: fixed; right: 16px; bottom: 16px; z-index: 40;
+      display: flex; align-items: center; gap: 6px;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 999px; padding: 10px 16px;
+      box-shadow: 0 6px 20px rgba(31, 35, 41, 0.14);
+      font-size: 14px; cursor: pointer; color: var(--text);
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    .backup-fab:hover { background: #f0f1f5; transform: translateY(-2px); }
+
+    /* 浏览器禁止保存数据时的提示 */
+    .storage-warn {
+      position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%);
+      background: #fff3cd; color: #8a6d3b; border: 1px solid #ffe08a;
+      padding: 10px 16px; border-radius: 12px; font-size: 13px;
+      z-index: 70; max-width: 90vw; text-align: center;
+    }
+
     .modal {
       position: fixed; inset: 0; background: rgba(20, 22, 28, 0.45);
       display: flex; align-items: center; justify-content: center;
@@ -390,6 +411,9 @@
     <button class="bg-btn" id="bg-add">🖼 添加背景</button>
     <button class="bg-btn" id="bg-remove" hidden>🗑 移除背景</button>
   </div>
+
+  <!-- 右下角：数据备份 -->
+  <button class="backup-fab" id="backup-btn">💾 备份</button>
 
   <div class="container">
     <header>
@@ -474,6 +498,21 @@
   <!-- 操作提示 -->
   <div class="toast" id="toast" hidden></div>
 
+  <!-- 数据备份弹窗 -->
+  <div class="modal" id="backup-modal" hidden>
+    <div class="modal-box">
+      <h2>数据备份</h2>
+      <p class="acct-tip">把你在本站的全部设置（网站、颜色、顺序、账号、背景）导出成一个文件保存；换设备或数据丢了，用它一键还原。</p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="backup-cancel">关闭</button>
+        <button class="btn primary" id="backup-export">📤 导出备份</button>
+      </div>
+      <div class="acct-extra">
+        <button class="btn link" id="backup-import">📥 选择备份文件导入</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function () {
       // ============================================================
@@ -535,6 +574,52 @@
       var activeId = null;
       var modalColor = '#4f7cff';
 
+      // ---------- 本地存储：安全读写（任何情况下都不抛错） ----------
+      // 有些浏览器/设置会禁止站点保存数据；此时页面照常能用，只是不记住改动。
+      var storageOK = (function () {
+        try {
+          var t = '__nav_probe__';
+          localStorage.setItem(t, '1');
+          localStorage.removeItem(t);
+          return true;
+        } catch (e) { return false; }
+      })();
+
+      function readRaw(key) {
+        if (!storageOK) return null;
+        try { return localStorage.getItem(key); } catch (e) { return null; }
+      }
+
+      function writeRaw(key, val) {
+        if (!storageOK) return false;
+        try { localStorage.setItem(key, val); return true; } catch (e) { return false; }
+      }
+
+      function removeRaw(key) {
+        if (!storageOK) return;
+        try { localStorage.removeItem(key); } catch (e) {}
+      }
+
+      function read(key, fallback) {
+        var raw = readRaw(key);
+        if (raw == null) return fallback;
+        try {
+          var v = JSON.parse(raw);
+          return v == null ? fallback : v;
+        } catch (e) { return fallback; }
+      }
+
+      function write(key, val) {
+        return writeRaw(key, JSON.stringify(val));
+      }
+
+      // 用户主动操作时用这个：保存失败会给出提示
+      function persist(key, val) {
+        var ok = write(key, val);
+        if (!ok) showToast('保存失败：浏览器不让本站存数据，或空间已满');
+        return ok;
+      }
+
       // ---------- 尺寸切换 ----------
       var sizeButtons = document.querySelectorAll('.size-btn');
       function applySize(size) {
@@ -542,21 +627,12 @@
         sizeButtons.forEach(function (b) {
           b.classList.toggle('active', b.getAttribute('data-size') === size);
         });
-        localStorage.setItem(LS.size, size);
+        writeRaw(LS.size, size);
       }
       sizeButtons.forEach(function (b) {
         b.addEventListener('click', function () { applySize(b.getAttribute('data-size')); });
       });
-      applySize(localStorage.getItem(LS.size) || 'medium');
-
-      // ---------- 工具函数 ----------
-      function read(key, fallback) {
-        try {
-          var v = JSON.parse(localStorage.getItem(key));
-          return v == null ? fallback : v;
-        } catch (e) { return fallback; }
-      }
-      function write(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+      applySize(readRaw(LS.size) || 'medium');
 
       function normalizeUrl(u) {
         u = (u || '').trim();
@@ -756,9 +832,9 @@
         if (isPublicId(id)) {
           var hidden = read(LS.hidden, []);
           if (hidden.indexOf(id) === -1) hidden.push(id);
-          write(LS.hidden, hidden);
+          persist(LS.hidden, hidden);
         } else {
-          write(LS.personal, read(LS.personal, []).filter(function (s) { return s.id !== id; }));
+          persist(LS.personal, read(LS.personal, []).filter(function (s) { return s.id !== id; }));
         }
         render();
       }
@@ -879,7 +955,7 @@
       var acctId = null;
 
       function loadAccounts() { return read(LS.acct, {}); }
-      function saveAccounts(obj) { write(LS.acct, obj); }
+      function saveAccounts(obj) { return write(LS.acct, obj); }
 
       function findSite(id) {
         var list = visibleSites();
@@ -945,9 +1021,10 @@
         var note = acctNote.value.trim();
         if (!username && !note) delete accts[acctId];
         else accts[acctId] = { username: username, note: note };
-        saveAccounts(accts);
+        var ok = saveAccounts(accts);
         closeAcct();
         render();
+        if (!ok) { showToast('保存失败：浏览器不让本站存数据'); return; }
         showToast(username ? '已保存账号' : '已保存备注');
       });
 
@@ -1040,9 +1117,7 @@
         reader.onload = function (e) {
           downscale(e.target.result, function (out) {
             if (!out) { showToast('这张图片处理不了，换一张试试'); return; }
-            try {
-              localStorage.setItem(LS.bg, out);
-            } catch (err) {
+            if (!writeRaw(LS.bg, out)) {
               showToast('图片太大存不下，换一张小一点的吧');
               return;
             }
@@ -1055,15 +1130,14 @@
       });
 
       bgRemove.addEventListener('click', function () {
-        try { localStorage.removeItem(LS.bg); } catch (e) {}
+        removeRaw(LS.bg);
         applyBg(null);
         showToast('背景已移除');
       });
 
       // 启动时恢复上次设置的背景
       (function () {
-        var saved = null;
-        try { saved = localStorage.getItem(LS.bg); } catch (e) {}
+        var saved = readRaw(LS.bg);
         if (saved) applyBg(saved);
       })();
 
@@ -1114,7 +1188,7 @@
           id: 'p' + Date.now() + Math.floor(Math.random() * 1000),
           name: name, url: url, icon: '🔗', color: modalColor
         });
-        write(LS.personal, personal);
+        persist(LS.personal, personal);
         render();
         closeModal();
       });
@@ -1219,7 +1293,7 @@
         var movedId = order.splice(drag.fromIndex, 1)[0];
         if (movedId !== undefined) {
           order.splice(drag.placeIndex, 0, movedId);
-          write(LS.order, order);
+          persist(LS.order, order);
         }
 
         var el = drag.el;
@@ -1305,6 +1379,103 @@
         document.addEventListener('pointermove', onMove);
         document.addEventListener('pointerup', onUp);
         document.addEventListener('pointercancel', onUp);
+      }
+
+      // ---------- 数据备份（导出 / 导入） ----------
+      var JSON_KEYS = ['personal', 'hidden', 'order', 'colors', 'acct'];
+      var RAW_KEYS = ['size', 'bg'];
+
+      var backupModal = document.getElementById('backup-modal');
+      var backupBtn = document.getElementById('backup-btn');
+      var backupCancel = document.getElementById('backup-cancel');
+      var backupExport = document.getElementById('backup-export');
+      var backupImport = document.getElementById('backup-import');
+      var importFile = document.createElement('input');
+      importFile.type = 'file';
+      importFile.accept = '.json,application/json';
+      importFile.style.display = 'none';
+      document.body.appendChild(importFile);
+
+      function openBackup() {
+        backupModal.hidden = false;
+        lockScroll(true);
+      }
+      function closeBackup() {
+        backupModal.hidden = true;
+        lockScroll(false);
+      }
+
+      backupBtn.addEventListener('click', openBackup);
+      backupCancel.addEventListener('click', closeBackup);
+      backupModal.addEventListener('click', function (e) { if (e.target === backupModal) closeBackup(); });
+
+      function buildBackup() {
+        var out = { app: 'zuoye-nav', version: 1, exportedAt: new Date().toISOString(), data: {} };
+        JSON_KEYS.forEach(function (k) {
+          var v = read(LS[k], null);
+          if (v !== null) out.data[k] = v;
+        });
+        RAW_KEYS.forEach(function (k) {
+          var v = readRaw(LS[k]);
+          if (v !== null) out.data[k] = v;
+        });
+        return out;
+      }
+
+      backupExport.addEventListener('click', function () {
+        try {
+          var blob = new Blob([JSON.stringify(buildBackup())], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          var d = new Date();
+          var stamp = '' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
+          a.href = url;
+          a.download = '作业导航备份-' + stamp + '.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+          closeBackup();
+          showToast('备份已导出，请保存好这个文件');
+        } catch (e) {
+          showToast('导出失败，换一个浏览器试试');
+        }
+      });
+
+      backupImport.addEventListener('click', function () {
+        importFile.value = '';
+        importFile.click();
+      });
+
+      importFile.addEventListener('change', function () {
+        var f = importFile.files && importFile.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          var obj;
+          try { obj = JSON.parse(e.target.result); }
+          catch (err) { showToast('这个文件不是有效的备份文件'); return; }
+          if (!obj || obj.app !== 'zuoye-nav' || !obj.data) { showToast('这不是本站的备份文件'); return; }
+          if (!window.confirm('导入会覆盖你当前的全部设置，确定继续吗？')) return;
+          var d = obj.data;
+          JSON_KEYS.forEach(function (k) { if (d[k] !== undefined) write(LS[k], d[k]); });
+          RAW_KEYS.forEach(function (k) { if (d[k] !== undefined) writeRaw(LS[k], d[k]); });
+          if (d.size) applySize(d.size);
+          if (d.bg) applyBg(d.bg);
+          render();
+          closeBackup();
+          showToast('备份已导入，设置已还原');
+        };
+        reader.onerror = function () { showToast('文件读取失败'); };
+        reader.readAsText(f);
+      });
+
+      // 浏览器禁止保存数据时给个提示（页面照常可用）
+      if (!storageOK) {
+        var warn = document.createElement('div');
+        warn.className = 'storage-warn';
+        warn.textContent = '⚠️ 你的浏览器禁止本站保存数据，本次的修改不会被记住';
+        document.body.appendChild(warn);
       }
 
       // 首次渲染
