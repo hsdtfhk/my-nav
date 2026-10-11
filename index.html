@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>作业导航 · 我的网站收藏</title>
+  <title>懒人导航 · 我的网站收藏</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>" />
   <style>
     :root {
@@ -67,6 +67,15 @@
     header { text-align: center; margin-bottom: 40px; }
 
     header h1 { font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+
+    /* 「懒人」二字：行楷，飘逸灵动，比「导航」略大 */
+    header h1 .lazy {
+      font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", "STKaiti", "华文楷体", "Kaiti SC", serif;
+      font-weight: 400;
+      font-size: 33px;
+      letter-spacing: 0.04em;
+      margin-right: 0.06em;
+    }
 
     header p { margin-top: 8px; color: var(--muted); font-size: 14px; }
 
@@ -417,7 +426,7 @@
 
   <div class="container">
     <header>
-      <h1>作业导航</h1>
+      <h1><span class="lazy">懒人</span>导航</h1>
       <p>点击卡片，一键跳转到对应网站</p>
     </header>
 
@@ -1430,7 +1439,7 @@
           var d = new Date();
           var stamp = '' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
           a.href = url;
-          a.download = '作业导航备份-' + stamp + '.json';
+          a.download = '懒人导航备份-' + stamp + '.json';
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
